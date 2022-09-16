@@ -669,15 +669,38 @@ impl Drop for IsoTpSocket {
     }
 }
 
+#[cfg(target_os = "macos")]
+const READ_LIMIT: usize = c_int::MAX as usize - 1;
+#[cfg(not(target_os = "macos"))]
+const READ_LIMIT: usize = libc::ssize_t::MAX as usize;
+
 impl io::Write for IsoTpSocket {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        // This either writes all bytes, or returns error
-        IsoTpSocket::write(&self, buf)?;
-
-        Ok(buf.len())
+        let ret = unsafe {
+            let val = write(
+                self.as_raw_fd(),
+                buf.as_ptr() as *const c_void,
+                std::cmp::min(buf.len(), READ_LIMIT),
+            );
+            if val == -1 { Err(io::Error::last_os_error()) } else { Ok(val) }
+        }?;
+        Ok(ret as usize)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
 }
+
+impl io::Read for IsoTpSocket {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let ret = unsafe {
+            let val = read(
+                self.as_raw_fd(),
+                buf.as_mut_ptr() as *mut c_void,
+                std::cmp::min(buf.len(), READ_LIMIT),
+            );
+            if val == -1 { Err(io::Error::last_os_error()) } else { Ok(val) }
+        }?;
+        Ok(ret as usize)
+    }}
