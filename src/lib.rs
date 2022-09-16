@@ -668,3 +668,16 @@ impl Drop for IsoTpSocket {
         self.close().ok(); // ignore result
     }
 }
+
+impl io::Write for IsoTpSocket {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        // This either writes all bytes, or returns error
+        IsoTpSocket::write(&self, buf)?;
+
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
